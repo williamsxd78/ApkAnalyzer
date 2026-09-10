@@ -8,13 +8,16 @@ class EngineError(Exception):
 
 
 def _engine_env():
-    """Return a subprocess env with JAVA_HOME/bin prepended to PATH so the
-    JADX/apktool launcher scripts can find `java`."""
+    """Return a subprocess env with JAVA_HOME/bin prepended to PATH and a bounded
+    JVM heap so a huge APK can't OOM-kill the whole backend worker."""
     env = dict(os.environ)
     java_home = os.environ.get("JAVA_HOME")
     if java_home:
         env["JAVA_HOME"] = java_home
         env["PATH"] = os.path.join(java_home, "bin") + os.pathsep + env.get("PATH", "")
+    heap = os.environ.get("ENGINE_JAVA_OPTS", "-Xmx3g")
+    env["JAVA_OPTS"] = (env.get("JAVA_OPTS", "") + " " + heap).strip()
+    env["JADX_OPTS"] = (env.get("JADX_OPTS", "") + " " + heap).strip()
     return env
 
 

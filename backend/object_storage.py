@@ -38,6 +38,28 @@ def put_object(path: str, data: bytes, content_type: str = "application/vnd.andr
     return resp.json()
 
 
+def put_object_file(path: str, file_path: str,
+                    content_type: str = "application/vnd.android.package-archive") -> dict:
+    """Stream a file from disk to object storage without loading it all into memory."""
+    key = init_storage()
+    with open(file_path, "rb") as fh:
+        resp = requests.put(
+            f"{STORAGE_URL}/objects/{path}",
+            headers={"X-Storage-Key": key, "Content-Type": content_type},
+            data=fh, timeout=600,
+        )
+    if resp.status_code == 404:
+        key = init_storage(force=True)
+        with open(file_path, "rb") as fh:
+            resp = requests.put(
+                f"{STORAGE_URL}/objects/{path}",
+                headers={"X-Storage-Key": key, "Content-Type": content_type},
+                data=fh, timeout=600,
+            )
+    resp.raise_for_status()
+    return resp.json()
+
+
 def download_to_file(path: str, dest_path: str):
     key = init_storage()
     resp = requests.get(f"{STORAGE_URL}/objects/{path}",

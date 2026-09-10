@@ -138,17 +138,45 @@ async def _persist_findings(scan_id, findings):
         await db.findings.insert_many(docs[i:i + 1000])
 
 
+TELEMETRY_EXECUTOR = ThreadPoolExecutor(max_workers=1)
+
+
+async def _telemetry_monitor(scan_id: str, out_dir: str, stop: asyncio.Event):
+    """Periodically record how many files JADX has produced (off the event loop)."""
+    loop = asyncio.get_event_loop()
+    while not stop.is_set():
+        try:
+            n = await loop.run_in_executor(TELEMETRY_EXECUTOR, _count_files, os.path.join(out_dir, "jadx"))
+            await db.scans.update_one({"id": scan_id}, {"$set": {"decompiled_files": n}})
+        except Exception:  # noqa
+            pass
+        try:
+            await asyncio.wait_for(stop.wait(), timeout=2.0)
+        except asyncio.TimeoutError:
+            pass
+
+
+def _count_files(base: str) -> int:
+    if not os.path.isdir(base):
+        return 0
+    n = 0
+    for _root, _dirs, files in os.walk(base):
+        n += len(files)
+        if n > 200000:
+            break
+    return n
+
+
 async def run_scan_job(scan_id: str, tmp_apk: str, out_dir: str, storage_path: str):
     loop = asyncio.get_event_loop()
     s = await get_settings()
+    stop = asyncio.Event()
+    monitor = asyncio.create_task(_telemetry_monitor(scan_id, out_dir, stop))
     try:
-        # Persist the APK blob to object storage in the background (best-effort, non-fatal).
-        await _set(scan_id, status="decompiling", stage="Storing APK", progress=8)
+        # Persist the APK blob to object storage (streamed from disk, best-effort, non-fatal).
+        await _set(scan_id, status="decompiling", stage="Storing APK", progress=8, decompiled_files=0)
         try:
-            with open(tmp_apk, "rb") as fh:
-                blob = fh.read()
-            await loop.run_in_executor(EXECUTOR, object_storage.put_object, storage_path, blob)
-            del blob
+            await loop.run_in_executor(EXECUTOR, object_storage.put_object_file, storage_path, tmp_apk)
         except Exception as exc:  # noqa
             logger.warning("object storage upload failed (continuing with local copy): %s", exc)
 
@@ -173,6 +201,11 @@ async def run_scan_job(scan_id: str, tmp_apk: str, out_dir: str, storage_path: s
         logger.exception("scan failure")
         await _set(scan_id, status="failed", stage="Failed", error=f"Unexpected error: {exc}")
     finally:
+        stop.set()
+        try:
+            await monitor
+        except Exception:  # noqa
+            pass
         if os.path.exists(tmp_apk):
             os.unlink(tmp_apk)
 
@@ -237,22 +270,7 @@ async def get_scan(scan_id: str):
     if not doc:
         raise HTTPException(404, "Scan not found")
     doc["counts"] = await _count_summary(scan_id)
-    # Live decompile telemetry while a job is running.
-    if doc.get("status") in ("decompiling", "scanning"):
-        doc["decompiled_files"] = _count_decompiled(scan_id)
     return doc
-
-
-def _count_decompiled(scan_id: str) -> int:
-    base = WORKSPACE / scan_id / "jadx"
-    if not base.exists():
-        return 0
-    n = 0
-    for _root, _dirs, files in os.walk(base):
-        n += len(files)
-        if n > 100000:
-            break
-    return n
 
 
 @api.delete("/scans/{scan_id}")

@@ -1,0 +1,25 @@
+{
+  "summary": "Verified the 502-on-upload bug fix end-to-end. Uploaded /app/data/test/real.apk (11.9MB) via POST /api/scans/upload and, while the scan was decompiling/scanning, hammered GET /api/scans and GET /api/scans/{id} once every ~1.5s for the full duration (~2m37s, ~100 polls each endpoint). ZERO non-200 responses (no 502), zero calls exceeded 2s. Upload itself returned 200 in ~1s. decompiled_files (integer, served from Mongo — no on-request tree walk) grew from 0 into the thousands and scan reached status=complete with counts.total>0. Backend worker did NOT restart/OOM. Full regression suite (test_apklens.py) still 22/22 green: sample-acme-wallet-demo-v2 has ~95 findings including SMTP/SendGrid/Mailgun/Twilio secret types and Admin endpoints tagged 'admin'; findings/tree/file/triage/rules/rescan/deobfuscate/settings all pass. Frontend regression: dashboard auto-loaded v2 sample (24 Secrets / 28 Endpoints / 8 Critical), clicking SMTP Password finding opens NotificationService.java with the inspector populated (matched value, entropy, jump-to-source, triage buttons). No new issues.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_apklens.py",
+    "/app/backend/tests/test_upload_responsiveness.py",
+    "/app/test_reports/pytest/pytest_results.xml",
+    "/app/test_reports/pytest/pytest_responsiveness.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Responsiveness fix is solid: telemetry monitor writes decompiled_files to Mongo every ~2s and GET /api/scans/{id} reads from DB, so the event loop stays free. Consider adding a lightweight timeout/heartbeat on the monitor task so a stuck scan doesn't leave stale decompiled_files values.",
+    "-Xmx3g cap on JADX/apktool is important with an 8GB cgroup + single uvicorn worker; expose ENGINE_JAVA_OPTS in settings/docs for operators tuning smaller hosts.",
+    "Upload streams from disk to object storage but the incoming multipart is still buffered by FastAPI/starlette to a spooled tmp file — fine for 12MB; if very large APKs (>500MB) are anticipated, consider chunked/streaming upload endpoint."
+  ],
+  "updated_files": ["/app/backend/tests/test_upload_responsiveness.py"],
+  "success_rate": {"backend": "100% (23/23 pytest: 22 regression + 1 new responsiveness)", "frontend": "100% of specified flows"},
+  "test_credentials": "no auth. Sample scan id sample-acme-wallet-demo-v2. Real APK at /app/data/test/real.apk.",
+  "seed_data_creation": "Each responsiveness test uploads a real-apk scan then DELETEs it in a finally block. Sample scan remains the only persistent scan.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "New file /app/backend/tests/test_upload_responsiveness.py is the definitive 502-regression test: measures upload latency, polls list+detail every 1.5s during scan, asserts no non-200 and no >2s response, verifies decompiled_files monotonic progress and final complete status. Runs in ~2m40s. Combined with test_apklens.py, total ~5min. Cleans up its own scan.",
+  "rca of the issue": "N/A — bug fix confirmed working. Root cause was addressed by (a) capping JADX/apktool JVM heap at -Xmx3g to prevent OOM-kill of the single uvicorn worker on large APKs, (b) streaming uploads to object storage from disk instead of reading fully into memory, and (c) moving decompiled-file counting to a background monitor that writes to Mongo, so GET /api/scans/{id} no longer walks the file tree on the event loop. Independently reproduced healthy behavior: no 502, no worker restart, sub-second polling latencies throughout."
+}
