@@ -54,6 +54,32 @@ SECRET_SIGNATURES = [
      "regex": re.compile(r"ghp_[0-9A-Za-z]{36}")},
     {"type": "Twilio API Key", "severity": "high",
      "regex": re.compile(r"SK[0-9a-fA-F]{32}")},
+    {"type": "Twilio Account SID", "severity": "high",
+     "regex": re.compile(r"AC[0-9a-fA-F]{32}")},
+    {"type": "Twilio Auth Token", "severity": "critical",
+     "regex": re.compile(r"(?i)twilio.{0,30}['\"][0-9a-f]{32}['\"]")},
+    {"type": "SendGrid API Key", "severity": "critical",
+     "regex": re.compile(r"SG\.[A-Za-z0-9_\-]{20,24}\.[A-Za-z0-9_\-]{39,45}")},
+    {"type": "Mailgun API Key", "severity": "high",
+     "regex": re.compile(r"key-[0-9a-zA-Z]{32}")},
+    {"type": "Mailchimp / Mandrill API Key", "severity": "high",
+     "regex": re.compile(r"[0-9a-f]{32}-us[0-9]{1,2}")},
+    {"type": "Vonage / Nexmo Secret", "severity": "high",
+     "regex": re.compile(r"(?i)(nexmo|vonage).{0,30}['\"][0-9a-zA-Z]{12,20}['\"]")},
+    {"type": "MessageBird API Key", "severity": "high",
+     "regex": re.compile(r"(?i)messagebird.{0,30}['\"][0-9A-Za-z]{25}['\"]")},
+    {"type": "Plivo Auth Token", "severity": "high",
+     "regex": re.compile(r"(?i)plivo.{0,30}['\"][0-9A-Za-z]{20,40}['\"]")},
+    {"type": "Postmark Server Token", "severity": "high",
+     "regex": re.compile(r"(?i)postmark.{0,30}['\"][0-9a-f\-]{36}['\"]")},
+    {"type": "SMTP Credentials in URL", "severity": "critical",
+     "regex": re.compile(r"smtps?://[^\s:'\"/]+:[^\s@'\"]+@[^\s'\"]+")},
+    {"type": "SMTP Password", "severity": "critical",
+     "regex": re.compile(r"(?i)(smtp[_.]?(pass|password|pwd|secret)|mail[_.]?(pass|password))['\"]?\s*[=:]\s*['\"][^'\"\s]{4,}['\"]")},
+    {"type": "SMTP User", "severity": "medium",
+     "regex": re.compile(r"(?i)(smtp[_.]?(user|username|login)|mail[_.]?user)['\"]?\s*[=:]\s*['\"][^'\"\s]{3,}['\"]")},
+    {"type": "SMTP Host", "severity": "low",
+     "regex": re.compile(r"(?i)(smtp[_.]?host|mail[_.]?host|mailhost)['\"]?\s*[=:]\s*['\"][^'\"\s]{3,}['\"]")},
     {"type": "JSON Web Token (JWT)", "severity": "medium",
      "regex": re.compile(r"eyJ[A-Za-z0-9_\-]{10,}\.eyJ[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}")},
     {"type": "Private Key Block", "severity": "critical",
@@ -71,6 +97,17 @@ SECRET_SIGNATURES = [
 # ---------------------------------------------------------------------------
 URL_RE = re.compile(r"https?://[^\s\"'<>)\\]+")
 IP_RE = re.compile(r"\b(?:(?:25[0-5]|2[0-4]\d|[01]?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d?\d)\b")
+ADMIN_KEYWORDS = ("admin", "administrator", "adminpanel", "admin-panel", "admin_area",
+                  "adminarea", "dashboard", "wp-admin", "wp-login", "manage", "management",
+                  "console", "backend", "cpanel", "superuser", "sysadmin", "controlpanel",
+                  "control-panel", "phpmyadmin", "webadmin")
+ADMIN_RE = re.compile(
+    r"""['"](/(?:%s)[A-Za-z0-9_/\-.]*)['"]""" % "|".join(ADMIN_KEYWORDS), re.I)
+
+
+def _is_admin_url(url: str) -> bool:
+    low = url.lower()
+    return any(("/" + k) in low or ("." + k) in low for k in ADMIN_KEYWORDS)
 
 def is_private_ip(ip: str) -> bool:
     parts = ip.split(".")
@@ -184,17 +221,41 @@ def scan_text_file(rel_path: str, text: str):
         for m in URL_RE.finditer(line):
             url = m.group(0).rstrip(".,;")
             is_http = url.lower().startswith("http://")
+            admin = _is_admin_url(url)
+            if admin:
+                etype, esev, etags = "Admin / Management URL", "high", ["admin"]
+            elif is_http:
+                etype, esev, etags = "Cleartext URL (HTTP)", "medium", ["cleartext"]
+            else:
+                etype, esev, etags = "URL", "info", []
+            if is_http and admin:
+                etags = etags + ["cleartext"]
             findings.append({
                 "category": "endpoint",
-                "type": "Cleartext URL (HTTP)" if is_http else "URL",
-                "severity": "medium" if is_http else "info",
+                "type": etype,
+                "severity": esev,
                 "file": rel_path,
                 "line": idx + 1,
                 "value": url[:400],
                 "masked_value": url[:400],
                 "context": _context(lines, idx),
                 "entropy": 0.0,
-                "tags": ["cleartext"] if is_http else [],
+                "tags": etags,
+            })
+        # --- endpoints: admin / management paths (string literals) ---
+        for m in ADMIN_RE.finditer(line):
+            path = m.group(1)
+            findings.append({
+                "category": "endpoint",
+                "type": "Admin / Management Endpoint",
+                "severity": "high",
+                "file": rel_path,
+                "line": idx + 1,
+                "value": path[:400],
+                "masked_value": path[:400],
+                "context": _context(lines, idx),
+                "entropy": 0.0,
+                "tags": ["admin"],
             })
         # --- endpoints: IPs ---
         for m in IP_RE.finditer(line):

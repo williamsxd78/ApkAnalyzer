@@ -6,7 +6,7 @@ from pathlib import Path
 
 import scanner
 
-SAMPLE_ID = "sample-acme-wallet-demo"
+SAMPLE_ID = "sample-acme-wallet-demo-v2"
 
 
 def _now():
@@ -30,6 +30,12 @@ async def seed(db, workspace: Path, persist_findings, count_summary):
 
     if await db.scans.find_one({"id": SAMPLE_ID}):
         return
+
+    # Remove any older/superseded sample scans so only the current one shows.
+    async for old in db.scans.find({"is_sample": True, "id": {"$ne": SAMPLE_ID}}, {"id": 1}):
+        await db.findings.delete_many({"scan_id": old["id"]})
+        await db.scans.delete_one({"id": old["id"]})
+        shutil.rmtree(workspace / old["id"], ignore_errors=True)
 
     src = Path(__file__).parent / "sample_src"
     dest = workspace / SAMPLE_ID

@@ -271,6 +271,8 @@ export default function Dashboard() {
 function StatusPanel({ scan }: { scan: Scan }) {
   const steps = ["queued", "decompiling", "scanning", "complete"];
   const idx = steps.indexOf(scan.status);
+  const decompiling = scan.status === "decompiling";
+  const files = scan.decompiled_files || 0;
   return (
     <div className="scanlines relative flex h-full flex-col items-center justify-center gap-6 p-8">
       <Loader2 className="h-10 w-10 animate-spin text-[#00E599]" />
@@ -285,6 +287,19 @@ function StatusPanel({ scan }: { scan: Scan }) {
         <div className="h-2 overflow-hidden rounded-full bg-[#0A0B10] ring-1 ring-[#23283B]">
           <div className="progress-flow h-full bg-[#00E599] transition-all duration-500" style={{ width: `${scan.progress}%` }} />
         </div>
+        <div className="mt-2 flex justify-between font-mono text-[11px]">
+          <span className="text-slate-500">{scan.progress}%</span>
+          {(decompiling || scan.status === "scanning") && (
+            <span className="text-[#38BDF8]" data-testid="decompiled-file-count">
+              {files.toLocaleString()} files extracted
+            </span>
+          )}
+        </div>
+        {decompiling && (
+          <p className="mt-3 text-center font-mono text-[11px] text-slate-600">
+            Large apps can take 1–2 minutes to fully decompile — the dashboard stays responsive.
+          </p>
+        )}
       </div>
     </div>
   );

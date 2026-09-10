@@ -1,0 +1,20 @@
+{
+  "summary": "Verified all 3 new APKLens features end-to-end. Backend: 22/22 pytest passed (previous 18 + 4 new). New v2 sample scan 'sample-acme-wallet-demo-v2' has counts.total=95 (>=60), old 'sample-acme-wallet-demo' correctly returns 404. Secrets category includes SendGrid API Key, Mailgun API Key, SMTP Password, SMTP Credentials in URL, Twilio Account SID (and SMTP User/Host, Twilio Auth Token, Vonage/Nexmo, MessageBird verified via type set). Endpoints category includes 'Admin / Management Endpoint' + 'Admin / Management URL' findings tagged 'admin' (>=3 hits). Live decompile progress verified via real API upload of /app/data/test/real.apk: GET /api/scans/{id} exposed 'decompiled_files' as an integer that grew from 0 -> thousands while status was decompiling/scanning, and scan completed successfully. Frontend: dashboard loaded v2 sample automatically with counts Secrets=24, Endpoints=28, Manifest=17, Crypto=8, Custom=3 in sidebar and 24 SECRETS / 28 ENDPOINTS / 8 CRITICAL in top bar; SMTP Password, SMTP Credentials in URL, SendGrid API Key, Mailgun API Key, Twilio Account SID rows all visible in Secrets list. Upload flow (upload-button -> apk-file-input set to /app/data/test/real.apk -> upload-submit-button) triggered StatusPanel showing queued/decompiling/scanning steps, progress bar, and live [data-testid='decompiled-file-count'] that ticked 0 -> 503 -> 2,596 -> 4,152 -> 5,262 -> 6,871 -> 7,709 -> 9,304 -> 10,181 -> 10,380 without freezing the UI (dropdown & sidebar remained interactive). No regressions.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": ["/app/backend/tests/test_apklens.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "_count_decompiled walks the entire jadx tree on every GET /api/scans/{id} poll (O(N) with N up to 100k files). Fine for now, but consider caching last count + walking incrementally, or using inotify, if concurrent scans grow.",
+    "decompiled_files only reported while status is decompiling/scanning; a very brief window where jadx has fully finished but apktool/scan hasn't refreshed status could momentarily flicker back to lower count. Not observed, but consider a monotonic max.",
+    "ADMIN_RE only matches admin path strings quoted with '/admin...' etc.; keywords appearing as plain paths without leading slash (e.g. bare 'wp-admin' literal) won't match. Current sample covers the common cases so acceptable."
+  ],
+  "updated_files": ["/app/backend/tests/test_apklens.py"],
+  "success_rate": {"backend": "100% (22/22 pytest)", "frontend": "100% of specified flows"},
+  "test_credentials": "no auth. Sample scan id sample-acme-wallet-demo-v2. Real APK /app/data/test/real.apk.",
+  "seed_data_creation": "Upload test creates and then deletes a real-apk scan each run (cleanup in pytest). Frontend upload test left one in-progress scan behind; can be cleaned via DELETE /api/scans/{id} but harmless.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Reuse /app/backend/tests/test_apklens.py which now targets sample-acme-wallet-demo-v2 (SAMPLE_ID) and asserts admin detection + SMTP/SMS secret types + live decompiled_files progress via real APK upload. Real APK decompile takes ~110s; the pytest live-upload test polls for up to 4min. Frontend StatusPanel uses [data-testid='decompiled-file-count']; scan list on the dashboard is a top dropdown (not sidebar) — Playwright drives it via the auto-selected v2 sample.",
+  "rca of the issue": "N/A — no bugs found in this iteration."
+}

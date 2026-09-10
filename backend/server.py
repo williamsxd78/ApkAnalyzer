@@ -237,7 +237,22 @@ async def get_scan(scan_id: str):
     if not doc:
         raise HTTPException(404, "Scan not found")
     doc["counts"] = await _count_summary(scan_id)
+    # Live decompile telemetry while a job is running.
+    if doc.get("status") in ("decompiling", "scanning"):
+        doc["decompiled_files"] = _count_decompiled(scan_id)
     return doc
+
+
+def _count_decompiled(scan_id: str) -> int:
+    base = WORKSPACE / scan_id / "jadx"
+    if not base.exists():
+        return 0
+    n = 0
+    for _root, _dirs, files in os.walk(base):
+        n += len(files)
+        if n > 100000:
+            break
+    return n
 
 
 @api.delete("/scans/{scan_id}")
