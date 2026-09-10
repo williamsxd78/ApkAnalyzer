@@ -14,8 +14,8 @@ if not BASE_URL:
                 BASE_URL = line.split("=", 1)[1].strip().rstrip("/")
 
 API = f"{BASE_URL}/api"
-SAMPLE_ID = "sample-acme-wallet-demo-v2"
-OLD_SAMPLE_ID = "sample-acme-wallet-demo"
+SAMPLE_ID = "sample-acme-wallet-demo-v3"
+OLD_SAMPLE_ID = "sample-acme-wallet-demo-v2"
 
 
 @pytest.fixture(scope="module")

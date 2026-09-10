@@ -34,6 +34,8 @@ export type Finding = {
   tags: string[];
   triage_state: string;
   rule_id?: string;
+  occurrences?: number;
+  files_count?: number;
 };
 
 export type Rule = {
@@ -58,6 +60,24 @@ export const api = {
           if (onProgress && e.total) onProgress(Math.round((e.loaded / e.total) * 100));
         },
       })
+      .then((r) => r.data);
+  },
+  uploadChunked: async (file: File, onProgress?: (p: number) => void) => {
+    const init = await http.post("/scans/upload/init", { filename: file.name }).then((r) => r.data);
+    const uploadId: string = init.upload_id;
+    const chunkSize: number = init.chunk_size || 5 * 1024 * 1024;
+    let offset = 0;
+    while (offset < file.size) {
+      const blob = file.slice(offset, offset + chunkSize);
+      const buf = await blob.arrayBuffer();
+      await http.put(`/scans/upload/${uploadId}/chunk`, buf, {
+        headers: { "Content-Type": "application/octet-stream" },
+      });
+      offset += blob.size;
+      if (onProgress) onProgress(Math.round((offset / file.size) * 100));
+    }
+    return http
+      .post<Scan>(`/scans/upload/${uploadId}/complete`, { filename: file.name })
       .then((r) => r.data);
   },
   deleteScan: (id: string) => http.delete(`/scans/${id}`).then((r) => r.data),

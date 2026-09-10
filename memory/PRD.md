@@ -25,12 +25,18 @@ Solo penetration tester / bug-bounty hunter running the tool locally.
 9. Interactive dashboard: file tree + categories, code viewer with highlighted finding lines & jump-to-line, finding inspector, global search (Cmd+K), type/severity/triage filters, triage persistence.
 
 ## Implemented (2026-06)
-- ✅ All 9 modules above, end-to-end. Full secret values shown (no masking, per user choice).
-- ✅ Preseeded sample scan `sample-acme-wallet-demo` (~65 findings) for instant demo.
-- ✅ Backend: 18/18 pytest cases pass. Frontend: all flows verified 100% by testing agent.
-- ✅ Real JADX + apktool + Java 17 installed in container; upload flow decompiles real APKs.
+- ✅ All 9 modules end-to-end. Full secret values shown (no masking).
+- ✅ Preseeded sample `sample-acme-wallet-demo-v3` (~88 findings) incl. SMTP/SMS keys, admin panels, encoded secrets.
+- ✅ Real JADX + apktool + JDK17 (arm64) persistently installed at `/app/engines`; heap capped via `ENGINE_JAVA_OPTS` (default -Xmx4g).
+- ✅ APK blobs via Emergent object storage (streamed from disk).
+- ✅ Stability: upload returns immediately; decompile/scan in background; live `decompiled_files` counter written by a monitor task (no event-loop blocking). Verified no 502 / no OOM under load.
+- ✅ Large APK support: chunked upload (init/chunk/complete, 5MB chunks) — handles 100s of MB past the Cloudflare single-request limit. 1GB cap via `MAX_UPLOAD_BYTES`.
+- ✅ Encoded-secret detection: decodes base64/hex/url in code and re-runs secret signatures (findings tagged `encoded`).
+- ✅ Admin/management panel & URL detection.
+- ✅ SMTP + SMS API secret signatures (SendGrid, Mailgun, Twilio, Vonage/Nexmo, MessageBird, Plivo, Postmark, SMTP creds/URLs).
+- ✅ Noise controls: `dedupe=true` collapses duplicate findings (Mongo aggregation, sorted+paginated), UI `dedup` toggle + ×N badges.
 
-## Backlog / Remaining
+## Remaining / Backlog
 - **P1**: WebSocket live progress (currently polling every 1.5s).
 - **P2**: Findings pagination UI when >100 in a category (backend supports skip/limit).
 - **P2**: Syntax token coloring in code viewer (currently plain monospace + hit highlight).

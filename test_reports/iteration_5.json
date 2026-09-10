@@ -1,0 +1,29 @@
+{
+  "summary": "Iteration 5 verified the three new features (chunked upload, encoded-secret detection, dedupe/noise controls) plus regression on v3 sample. Backend: 25/25 pytest pass — 22 regression tests in test_apklens.py (sample id updated to sample-acme-wallet-demo-v3) + 4 new tests in test_chunked_encoded_dedupe.py. Chunked upload of /app/data/test/real.apk (11,904,560 B) in 3 x ~5MB PUT chunks each returned quickly (no 502), /complete returned scan doc with size==11904560, and the scan reached status=complete with counts.total>0 (~170s total). Encoded secrets: base64 AWS 'AKIAIOSFODNN7EXAMPLE', hex Google API key, base64/url-encoded Stripe Live all present, tagged 'encoded', and value fields carry the DECODED plaintext. Dedupe: raw=32 findings vs deduped=27 groups; each item carries 'occurrences' and 'files_count' with 5 groups occurrences>1 (e.g. Stripe Live x3, AWS x2, Google x2). Frontend: toggle-dedupe present, ON by default, ×N badges render (×3, ×2), toggling OFF expanded 27->32 rows and back. Upload dialog opens with apk-file-input + upload-submit-button. Old sample ids (v1, v2) return 404. No 502s observed anywhere.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_apklens.py",
+    "/app/backend/tests/test_chunked_encoded_dedupe.py",
+    "/app/backend/tests/test_upload_responsiveness.py",
+    "/app/test_reports/pytest/pytest_iter5.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Chunked upload endpoints have no ownership/auth (fine given no-auth product), but /upload/{id}/chunk lets any client append to any known upload_id and there is no server-side size cap or per-session TTL. Consider a max-total-size guard and a background sweeper of stale UPLOAD_TMP parts to prevent disk exhaustion.",
+    "list_findings dedupe pipeline caps groups at 3000 and does its skip/limit slicing in Python after aggregation; for scans with >3000 unique (type,value) groups the tail would be silently truncated. Push the sort+skip+limit into the aggregation with $sort/$skip/$limit stages.",
+    "_decode_variants base64 heuristic can over-match innocuous base64 blobs; the sample flags Obfuscated.java correctly today, but adding a strict re-validation of the DECODED value against the original detector regex before creating an 'encoded' finding will keep FPs low as inputs grow.",
+    "Regression debt: SAMPLE_ID is embedded in tests and seed. Consider exposing the current sample id via GET /api/settings so the frontend and tests do not need to be bumped every version."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_apklens.py",
+    "/app/backend/tests/test_chunked_encoded_dedupe.py"
+  ],
+  "success_rate": {"backend": "100% (25/25 pytest)", "frontend": "100% of specified flows (toggle-dedupe, ×N badges, upload dialog)"},
+  "test_credentials": "no auth",
+  "seed_data_creation": "test_chunked_upload_full_scan creates a real-apk scan and DELETEs it in finally. No residual scans.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "SAMPLE_ID is now sample-acme-wallet-demo-v3 in both test files. test_chunked_encoded_dedupe.py::test_chunked_upload_full_scan is a ~170s live test (real APK decompile+scan) — skip with -k 'not chunked_upload_full_scan' for a fast run. Chunked upload flow: POST /api/scans/upload/init {filename} -> {upload_id, chunk_size:5MB}; PUT /api/scans/upload/{upload_id}/chunk (raw octet-stream); POST /api/scans/upload/{upload_id}/complete {filename}. Frontend uses api.uploadChunked in UploadDialog.",
+  "rca of the issue": "N/A — all three features work end-to-end. Chunked upload is the correct fix for the 157MB/Cloudflare-502 case because each PUT is 5MB (well under any edge/CDN limit) and the server appends to a temp part before enqueuing the scan; total upload time scales linearly with size without any single long-lived request."
+}

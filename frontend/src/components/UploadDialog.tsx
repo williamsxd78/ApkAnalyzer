@@ -22,7 +22,9 @@ export function UploadDialog({ open, onClose, engines, onUploaded }: {
     if (!file) return;
     setBusy(true);
     try {
-      const scan = await api.upload(file, setProgress);
+      // Chunked upload avoids the ingress/Cloudflare single-request size limit,
+      // so very large APKs (100s of MB) upload reliably.
+      const scan = await api.uploadChunked(file, setProgress);
       toast.success("APK uploaded — decompiling in background");
       onUploaded(scan.id);
       onClose();

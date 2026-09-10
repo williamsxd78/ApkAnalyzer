@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, APIRouter, UploadFile, File, HTTPException, Query
+from fastapi import FastAPI, APIRouter, UploadFile, File, HTTPException, Query, Request
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -259,6 +259,74 @@ async def upload_apk(file: UploadFile = File(...)):
     return doc
 
 
+UPLOAD_TMP = WORKSPACE.parent / "uploads_tmp"
+UPLOAD_TMP.mkdir(parents=True, exist_ok=True)
+
+
+def _upload_part_path(upload_id: str) -> Path:
+    return UPLOAD_TMP / f"{upload_id}.part"
+
+
+@api.post("/scans/upload/init")
+async def upload_init(body: dict):
+    """Begin a chunked upload (for large APKs that exceed a single request limit)."""
+    filename = (body or {}).get("filename", "app.apk")
+    if not filename.lower().endswith(".apk"):
+        raise HTTPException(400, "Only .apk files are supported.")
+    upload_id = new_id()
+    _upload_part_path(upload_id).write_bytes(b"")
+    return {"upload_id": upload_id, "chunk_size": 5 * 1024 * 1024}
+
+
+MAX_UPLOAD_BYTES = int(os.environ.get("MAX_UPLOAD_BYTES", str(1024 * 1024 * 1024)))  # 1 GB
+
+
+@api.put("/scans/upload/{upload_id}/chunk")
+async def upload_chunk(upload_id: str, request: Request):
+    part = _upload_part_path(upload_id)
+    if not part.exists():
+        raise HTTPException(404, "Upload session not found. Call /upload/init first.")
+    data = await request.body()
+    if part.stat().st_size + len(data) > MAX_UPLOAD_BYTES:
+        part.unlink(missing_ok=True)
+        raise HTTPException(413, "Upload exceeds the maximum allowed APK size.")
+    with open(part, "ab") as fh:
+        fh.write(data)
+    return {"received": len(data), "total": part.stat().st_size}
+
+
+@api.post("/scans/upload/{upload_id}/complete")
+async def upload_complete(upload_id: str, body: dict):
+    part = _upload_part_path(upload_id)
+    if not part.exists():
+        raise HTTPException(404, "Upload session not found.")
+    size = part.stat().st_size
+    if size == 0:
+        part.unlink(missing_ok=True)
+        raise HTTPException(400, "No data received for this upload.")
+    filename = (body or {}).get("filename", "app.apk")
+    scan_id = new_id()
+    out_dir = WORKSPACE / scan_id
+    out_dir.mkdir(parents=True, exist_ok=True)
+    # Rename the assembled part into a stable temp apk the job will consume + delete.
+    tmp_apk = str(UPLOAD_TMP / f"{scan_id}.apk")
+    os.replace(part, tmp_apk)
+
+    storage_path = f"{object_storage.APP_NAME}/uploads/{scan_id}.apk"
+    doc = {
+        "id": scan_id, "filename": filename, "size": size,
+        "storage_path": storage_path,
+        "status": "queued", "stage": "Queued", "progress": 0,
+        "error": None, "counts": {"total": 0, "by_category": {}, "by_severity": {}},
+        "is_sample": False, "created_at": now_iso(), "updated_at": now_iso(),
+    }
+    await db.scans.insert_one(doc)
+    asyncio.create_task(run_scan_job(scan_id, tmp_apk, str(out_dir), storage_path))
+    doc.pop("_id", None)
+    return doc
+
+
+
 @api.get("/scans")
 async def list_scans():
     return await db.scans.find({}, {"_id": 0}).sort("created_at", -1).to_list(200)
@@ -383,6 +451,7 @@ async def list_findings(scan_id: str,
                         triage: Optional[str] = None,
                         q: Optional[str] = None,
                         file: Optional[str] = None,
+                        dedupe: bool = False,
                         skip: int = 0, limit: int = 100):
     query = {"scan_id": scan_id}
     if category:
@@ -396,8 +465,45 @@ async def list_findings(scan_id: str,
     if q:
         rx = {"$regex": q, "$options": "i"}
         query["$or"] = [{"value": rx}, {"type": rx}, {"file": rx}, {"context": rx}]
-    total = await db.findings.count_documents(query)
     sev_order = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}
+
+    if dedupe:
+        # Collapse near-duplicate hits (same type + value) into one representative row
+        # with an occurrence count. Sort + paginate inside Mongo so it scales to huge apps.
+        lim = min(limit, 500)
+        pipeline = [
+            {"$match": query},
+            {"$group": {
+                "_id": {"t": "$type", "v": "$value"},
+                "doc": {"$first": "$$ROOT"},
+                "occurrences": {"$sum": 1},
+                "files": {"$addToSet": "$file"},
+            }},
+            {"$replaceRoot": {"newRoot": {"$mergeObjects": [
+                "$doc", {"occurrences": "$occurrences", "files_count": {"$size": "$files"}}]}}},
+            {"$addFields": {"_rank": {"$switch": {"branches": [
+                {"case": {"$eq": ["$severity", "critical"]}, "then": 0},
+                {"case": {"$eq": ["$severity", "high"]}, "then": 1},
+                {"case": {"$eq": ["$severity", "medium"]}, "then": 2},
+                {"case": {"$eq": ["$severity", "low"]}, "then": 3},
+            ], "default": 4}}}},
+            {"$sort": {"_rank": 1, "occurrences": -1}},
+            {"$facet": {
+                "items": [{"$skip": skip}, {"$limit": lim}],
+                "meta": [{"$count": "total"}],
+            }},
+        ]
+        res = await db.findings.aggregate(pipeline, allowDiskUse=True).to_list(1)
+        facet = res[0] if res else {"items": [], "meta": []}
+        total = facet["meta"][0]["total"] if facet["meta"] else 0
+        items = []
+        for d in facet["items"]:
+            d.pop("_id", None)
+            d.pop("_rank", None)
+            items.append(d)
+        return {"total": total, "skip": skip, "limit": lim, "items": items, "deduped": True}
+
+    total = await db.findings.count_documents(query)
     items = await db.findings.find(query, {"_id": 0}).skip(skip).limit(min(limit, 500)).to_list(min(limit, 500))
     items.sort(key=lambda f: sev_order.get(f.get("severity"), 9))
     return {"total": total, "skip": skip, "limit": limit, "items": items}

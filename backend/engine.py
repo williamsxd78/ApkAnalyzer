@@ -15,7 +15,7 @@ def _engine_env():
     if java_home:
         env["JAVA_HOME"] = java_home
         env["PATH"] = os.path.join(java_home, "bin") + os.pathsep + env.get("PATH", "")
-    heap = os.environ.get("ENGINE_JAVA_OPTS", "-Xmx3g")
+    heap = os.environ.get("ENGINE_JAVA_OPTS", "-Xmx4g")
     env["JAVA_OPTS"] = (env.get("JAVA_OPTS", "") + " " + heap).strip()
     env["JADX_OPTS"] = (env.get("JADX_OPTS", "") + " " + heap).strip()
     return env

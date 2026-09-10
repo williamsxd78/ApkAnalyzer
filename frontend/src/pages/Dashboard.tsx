@@ -13,7 +13,7 @@ import { Deobfuscator } from "@/components/Deobfuscator";
 import { GlobalSearch } from "@/components/GlobalSearch";
 import { UploadDialog } from "@/components/UploadDialog";
 import { SettingsDialog } from "@/components/SettingsDialog";
-import { Key, Globe, FileCog, ShieldAlert, Crosshair, Code2, Binary, ListFilter, Files, Loader2, AlertTriangle, Trash2 } from "lucide-react";
+import { Key, Globe, FileCog, ShieldAlert, Crosshair, Code2, Binary, ListFilter, Files, Loader2, AlertTriangle, Trash2, Layers } from "lucide-react";
 import { toast } from "sonner";
 
 const ICONS: Record<string, any> = { secret: Key, endpoint: Globe, manifest: FileCog, crypto: ShieldAlert, custom: Crosshair };
@@ -35,6 +35,7 @@ export default function Dashboard() {
   const [category, setCategory] = useState("secret");
   const [severity, setSeverity] = useState("");
   const [triage, setTriage] = useState("");
+  const [dedupe, setDedupe] = useState(true);
   const [findings, setFindings] = useState<Finding[]>([]);
   const [selected, setSelected] = useState<Finding | null>(null);
 
@@ -92,8 +93,9 @@ export default function Dashboard() {
     const params: any = { category, limit: 300 };
     if (severity) params.severity = severity;
     if (triage) params.triage = triage;
+    if (dedupe) params.dedupe = true;
     api.findings(activeId, params).then((d) => setFindings(d.items));
-  }, [activeId, category, severity, triage]);
+  }, [activeId, category, severity, triage, dedupe]);
 
   useEffect(() => { loadFindings(); }, [loadFindings, activeScan?.status]);
 
@@ -204,6 +206,16 @@ export default function Dashboard() {
                   <option value="">all triage</option>
                   {["open", "confirmed", "false_positive", "dismissed"].map((s) => <option key={s} value={s}>{s.replace("_", " ")}</option>)}
                 </select>
+                <button
+                  data-testid="toggle-dedupe"
+                  onClick={() => setDedupe((v) => !v)}
+                  title="Collapse near-duplicate findings"
+                  className={`shrink-0 rounded-sm border px-2 py-1 font-mono text-[11px] transition-colors ${
+                    dedupe ? "border-[#00E599]/40 bg-[#00E599]/10 text-[#00E599]" : "border-[#23283B] text-slate-400 hover:text-slate-200"
+                  }`}
+                >
+                  <Layers className="mr-1 inline h-3 w-3" />dedup
+                </button>
               </div>
 
               <div className="flex-1 overflow-y-auto" data-testid="findings-list">

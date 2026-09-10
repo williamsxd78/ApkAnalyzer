@@ -203,6 +203,8 @@ def scan_text_file(rel_path: str, text: str):
                     "context": _context(lines, idx),
                     "entropy": ent,
                 })
+        # --- encoded secrets (Base64 / hex / URL-encoded values hiding secrets) ---
+        findings.extend(_scan_encoded_secrets(rel_path, line, lines, idx))
         # --- crypto / storage ---
         for sig in CRYPTO_SIGNATURES:
             if sig["regex"].search(line):
@@ -275,6 +277,78 @@ def scan_text_file(rel_path: str, text: str):
                 "entropy": 0.0,
                 "tags": ["internal"] if priv else [],
             })
+    return findings
+
+
+_B64_CANDIDATE = re.compile(r"[A-Za-z0-9+/]{20,}={0,2}")
+_HEX_CANDIDATE = re.compile(r"\b[0-9a-fA-F]{32,}\b")
+_URLENC_CANDIDATE = re.compile(r"(?:%[0-9A-Fa-f]{2}){3,}[^\s'\"]*")
+
+
+def _decode_variants(token: str):
+    """Yield (method, decoded_text) for a candidate encoded token."""
+    out = []
+    # base64
+    try:
+        padded = token + "=" * (-len(token) % 4)
+        dec = base64.b64decode(padded, validate=True)
+        txt = dec.decode("utf-8", "strict")
+        if txt and all(31 < ord(c) < 127 or c in "\t\n\r" for c in txt):
+            out.append(("base64", txt))
+    except (binascii.Error, ValueError, UnicodeDecodeError):
+        pass
+    # hex
+    if len(token) % 2 == 0:
+        try:
+            txt = bytes.fromhex(token).decode("utf-8", "strict")
+            if txt and all(31 < ord(c) < 127 or c in "\t\n\r" for c in txt):
+                out.append(("hex", txt))
+        except (ValueError, UnicodeDecodeError):
+            pass
+    # url-encoded
+    if "%" in token:
+        dec = urllib.parse.unquote(token)
+        if dec != token:
+            out.append(("url", dec))
+    return out
+
+
+def _scan_encoded_secrets(rel_path, line, lines, idx):
+    """Find secrets hidden inside Base64/hex/URL-encoded string literals."""
+    findings = []
+    candidates = []
+    for rx in (_B64_CANDIDATE, _HEX_CANDIDATE, _URLENC_CANDIDATE):
+        for m in rx.finditer(line):
+            candidates.append(m.group(0))
+            if len(candidates) >= 8:  # bound work per line
+                break
+    seen = set()
+    for token in candidates:
+        for method, decoded in _decode_variants(token):
+            snippet = decoded[:500]
+            for sig in SECRET_SIGNATURES:
+                if sig["type"] in ("Email Address", "SMTP Host", "SMTP User"):
+                    continue  # too noisy once decoded
+                sm = sig["regex"].search(snippet)
+                if not sm:
+                    continue
+                dval = sm.group(0)
+                key = (sig["type"], dval)
+                if key in seen:
+                    continue
+                seen.add(key)
+                findings.append({
+                    "category": "secret",
+                    "type": f"{sig['type']} ({method}-encoded)",
+                    "severity": sig["severity"],
+                    "file": rel_path,
+                    "line": idx + 1,
+                    "value": dval[:400],
+                    "masked_value": mask(dval[:400]),
+                    "context": f"encoded ({method}): {token[:120]}\ndecoded: {snippet[:200]}",
+                    "entropy": shannon_entropy(dval),
+                    "tags": ["encoded", method],
+                })
     return findings
 
 

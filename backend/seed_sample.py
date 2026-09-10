@@ -6,7 +6,7 @@ from pathlib import Path
 
 import scanner
 
-SAMPLE_ID = "sample-acme-wallet-demo-v2"
+SAMPLE_ID = "sample-acme-wallet-demo-v3"
 
 
 def _now():
