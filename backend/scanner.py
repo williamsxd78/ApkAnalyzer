@@ -324,6 +324,11 @@ def _scan_encoded_secrets(rel_path, line, lines, idx):
                 break
     seen = set()
     for token in candidates:
+        if len(token) < 24:
+            continue
+        # Skip normal identifiers/hashes: only decode high-entropy blobs.
+        if "%" not in token and shannon_entropy(token) < 3.8:
+            continue
         for method, decoded in _decode_variants(token):
             snippet = decoded[:500]
             for sig in SECRET_SIGNATURES:

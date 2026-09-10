@@ -7,22 +7,32 @@ class EngineError(Exception):
     pass
 
 
+def cpu_budget() -> int:
+    """Effective CPU cores available to this container (respects cgroup quota)."""
+    try:
+        with open("/sys/fs/cgroup/cpu.max") as fh:
+            quota, period = fh.read().split()
+            if quota != "max":
+                return max(1, int(int(quota) / int(period)))
+    except (OSError, ValueError):
+        pass
+    return os.cpu_count() or 2
+
+
 def _engine_env():
-    """Return a subprocess env with JAVA_HOME/bin prepended to PATH and a bounded
-    JVM heap so a huge APK can't OOM-kill the whole backend worker."""
+    """Subprocess env: JAVA on PATH + a bounded JVM heap (avoids OOM-killing the worker)."""
     env = dict(os.environ)
     java_home = os.environ.get("JAVA_HOME")
     if java_home:
         env["JAVA_HOME"] = java_home
         env["PATH"] = os.path.join(java_home, "bin") + os.pathsep + env.get("PATH", "")
-    heap = os.environ.get("ENGINE_JAVA_OPTS", "-Xmx4g")
+    heap = os.environ.get("ENGINE_JAVA_OPTS", "-Xmx5g")
     env["JAVA_OPTS"] = (env.get("JAVA_OPTS", "") + " " + heap).strip()
-    env["JADX_OPTS"] = (env.get("JADX_OPTS", "") + " " + heap).strip()
+    env.pop("JADX_OPTS", None)
     return env
 
 
 def check_engines(jadx_bin: str, apktool_bin: str):
-    """Return availability dict for configured engine binaries."""
     return {
         "jadx": {"path": jadx_bin, "available": _runnable(jadx_bin)},
         "apktool": {"path": apktool_bin, "available": _runnable(apktool_bin)},
@@ -47,14 +57,20 @@ def _java_available() -> bool:
 def run_jadx(jadx_bin: str, apk_path: str, out_dir: str):
     sources = os.path.join(out_dir, "jadx")
     os.makedirs(sources, exist_ok=True)
-    cmd = [jadx_bin, "-d", sources, "--no-res", "--show-bad-code", apk_path]
-    _run(cmd, "JADX", timeout=1800)
+    threads = str(cpu_budget())
+    # Match thread count to the real CPU budget (avoids thrashing when the container
+    # is CPU-throttled) and skip debug info / resources for speed.
+    cmd = [jadx_bin, "-d", sources, "--no-res", "--no-debug-info",
+           "--threads-count", threads, apk_path]
+    _run(cmd, "JADX", timeout=3600)
     return sources
 
 
 def run_apktool(apktool_bin: str, apk_path: str, out_dir: str):
     decoded = os.path.join(out_dir, "apktool")
-    cmd = [apktool_bin, "d", "-f", "-o", decoded, apk_path]
+    # -s: skip baksmali (the slow part) — we only need the decoded manifest + resources;
+    # readable code comes from JADX. This dramatically speeds up large APKs.
+    cmd = [apktool_bin, "d", "-s", "-f", "-o", decoded, apk_path]
     _run(cmd, "apktool", timeout=1800)
     return decoded
 

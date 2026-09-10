@@ -343,9 +343,20 @@ async def get_scan(scan_id: str):
 
 @api.delete("/scans/{scan_id}")
 async def delete_scan(scan_id: str):
+    doc = await db.scans.find_one({"id": scan_id}, {"_id": 0})
+    if not doc:
+        raise HTTPException(404, "Scan not found")
+    if doc.get("is_sample"):
+        raise HTTPException(400, "The sample scan cannot be deleted.")
     await db.findings.delete_many({"scan_id": scan_id})
     await db.scans.delete_one({"id": scan_id})
     shutil.rmtree(WORKSPACE / scan_id, ignore_errors=True)
+    part = UPLOAD_TMP / f"{scan_id}.apk"
+    if part.exists():
+        part.unlink()
+    if doc.get("storage_path"):
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(EXECUTOR, object_storage.delete_object, doc["storage_path"])
     return {"deleted": scan_id}
 
 

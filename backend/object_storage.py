@@ -74,3 +74,12 @@ def download_to_file(path: str, dest_path: str):
             if chunk:
                 fh.write(chunk)
     return dest_path
+
+
+
+def delete_object(path: str):
+    try:
+        key = init_storage()
+        requests.delete(f"{STORAGE_URL}/objects/{path}", headers={"X-Storage-Key": key}, timeout=30)
+    except Exception:  # noqa
+        pass

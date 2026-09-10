@@ -132,11 +132,12 @@ export default function Dashboard() {
 
   const deleteScan = async () => {
     if (!activeScan || activeScan.is_sample) { toast.error("Cannot delete the sample scan"); return; }
+    if (!window.confirm(`Remove "${activeScan.filename}" and its decompiled data + uploaded APK? This cannot be undone.`)) return;
     await api.deleteScan(activeScan.id);
-    setActiveId(""); setActiveScan(null);
+    setActiveId(""); setActiveScan(null); setSelected(null); setOpenPath(null);
     const list = await loadScans();
     if (list[0]) setActiveId(list[0].id);
-    toast.success("Scan deleted");
+    toast.success("APK & scan removed");
   };
 
   const counts = activeScan?.counts?.by_category || {};
@@ -241,7 +242,10 @@ export default function Dashboard() {
               );
             })}
             {activeScan && !activeScan.is_sample && (
-              <button data-testid="delete-scan-button" onClick={deleteScan} className="ml-auto px-4 text-slate-500 hover:text-rose-400"><Trash2 className="h-4 w-4" /></button>
+              <button data-testid="delete-scan-button" onClick={deleteScan}
+                className="ml-auto flex items-center gap-1.5 px-4 font-mono text-xs text-slate-400 transition-colors hover:text-rose-400">
+                <Trash2 className="h-4 w-4" /> Delete APK
+              </button>
             )}
           </div>
 
@@ -285,6 +289,9 @@ function StatusPanel({ scan }: { scan: Scan }) {
   const idx = steps.indexOf(scan.status);
   const decompiling = scan.status === "decompiling";
   const files = scan.decompiled_files || 0;
+  const elapsed = scan.created_at ? Math.max(0, Math.floor((Date.now() - Date.parse(scan.created_at)) / 1000)) : 0;
+  const mm = String(Math.floor(elapsed / 60)).padStart(2, "0");
+  const ss = String(elapsed % 60).padStart(2, "0");
   return (
     <div className="scanlines relative flex h-full flex-col items-center justify-center gap-6 p-8">
       <Loader2 className="h-10 w-10 animate-spin text-[#00E599]" />
@@ -300,7 +307,7 @@ function StatusPanel({ scan }: { scan: Scan }) {
           <div className="progress-flow h-full bg-[#00E599] transition-all duration-500" style={{ width: `${scan.progress}%` }} />
         </div>
         <div className="mt-2 flex justify-between font-mono text-[11px]">
-          <span className="text-slate-500">{scan.progress}%</span>
+          <span className="text-slate-500" data-testid="scan-elapsed">elapsed {mm}:{ss}</span>
           {(decompiling || scan.status === "scanning") && (
             <span className="text-[#38BDF8]" data-testid="decompiled-file-count">
               {files.toLocaleString()} files extracted
@@ -309,7 +316,8 @@ function StatusPanel({ scan }: { scan: Scan }) {
         </div>
         {decompiling && (
           <p className="mt-3 text-center font-mono text-[11px] text-slate-600">
-            Large apps can take 1–2 minutes to fully decompile — the dashboard stays responsive.
+            JADX writes all files at the very end, so the count jumps near completion.
+            On this CPU-limited host, large APKs can take several minutes.
           </p>
         )}
       </div>
