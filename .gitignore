@@ -79,4 +79,5 @@ agenthub/agents/youtube/db
 memory/test_credentials.md
 
 # Mobile development
-android-sdk/
+android-sdk/engines/jadx/lib/jadx-1.5.0-all.jar
+engines/jdk/lib/modules

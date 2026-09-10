@@ -1,0 +1,25 @@
+{
+  "summary": "Bug-fix verification for APKLens real-APK upload/decompile pipeline PASSED end-to-end. GET /api/settings reports engines.jadx.available=true, apktool.available=true, java.available=true. POST /api/scans/upload with /app/data/test/real.apk (11.9MB, org.fdroid.fdroid) returned HTTP 200 in ~1s with status='queued' (no blocking, no 502). Polling GET /api/scans/{id} showed progression queued -> decompiling (JADX ~15% -> apktool ~45%) -> scanning (70%) -> complete (100%) within ~110s. Final counts.total=3018. GET /api/scans/{id}/findings?category=secret returned 3 items, category=endpoint returned 2445 items. GET /api/scans/{id}/tree returned 8705 nodes. GET /api/scans/{id}/file for a discovered .java path returned source lines. Full pytest regression suite (18/18) still passes. Frontend: upload dialog shows 'JADX ready / apktool ready', file input accepted /app/data/test/real.apk, dashboard auto-loaded the completed real.apk scan showing 3 SECRETS / 2445 ENDPOINTS / 205 CRITICAL in the top bar. Sample scan regression: selecting sample-acme-wallet-demo populates counts 15/22/17/8/3, clicking a finding row loads both the center code viewer (ApiClient.java with line 10 highlighted) and the right inspector (severity chip, matched value, entropy 4.750, context, TRIAGE Confirm/False+/Dismiss). Custom Rules tab renders create form + existing rules + Re-scan button. Deobfuscator decoded SGVsbG8gV29ybGQ= -> 'Hello World'. Files tree renders apktool/ jadx/ hierarchy. Settings dialog shows java ok / jadx ok / apktool ok.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_apklens.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "run_scan_job is scheduled via asyncio.create_task without a strong reference or task registry — if the ASGI worker recycles mid-decompile the scan will be silently stuck in decompiling/scanning. Consider a background task registry or a proper job queue for production.",
+    "Background job wraps blocking JADX/apktool subprocesses; make sure they are launched via asyncio.create_subprocess_exec (not sync subprocess.run) so the event loop is not blocked during multi-minute decompilations. Behaviour on the test pod was fine but under concurrency this can starve other requests.",
+    "Uploaded APK is written to a tempfile before returning 200; if the pod restarts before run_scan_job picks it up the scan will remain 'queued' forever with no retry.",
+    "server.py file_tree() still silently truncates at count>8000 (real.apk tree returned 8705 — reached limit territory)."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (18/18 pytest + real-apk pipeline)", "frontend": "100% of specified flows verified"},
+  "test_credentials": "no auth; sample scan id sample-acme-wallet-demo; real APK on pod /app/data/test/real.apk",
+  "seed_data_creation": "Created a real scan via API upload: id=7ecb7365-4686-4b71-8986-4ed9020299ed (real.apk, complete, 3018 findings). Left in DB for retesting.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Reuse /app/backend/tests/test_apklens.py for regression. Real uploaded scan id 7ecb7365-4686-4b71-8986-4ed9020299ed persists. Real APK end-to-end took ~110s on the test pod; keep poll budget >=4min. Cmd+K keyboard shortcut did not open the cmdk dialog under Playwright headless (Meta+K mapping) — global header search input still functions.",
+  "rca of the issue": "Original user-facing bug ('nothing happened on upload') was fixed on two fronts: (a) engines moved to persistent /app/engines path so JADX/apktool/JDK17 survive restarts and /api/settings now reports all three as available; (b) POST /api/scans/upload no longer blocks on object-storage put — it writes to a tempfile, immediately returns HTTP 200 with status=queued, and offloads storage put + JADX + apktool + scan to an asyncio background task. Verified: request finished in ~1s for 11.9MB file (previously would 502 on Cloudflare), and the scan progressed through decompiling/scanning to complete with 3018 findings within ~110s."
+}

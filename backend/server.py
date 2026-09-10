@@ -138,13 +138,19 @@ async def _persist_findings(scan_id, findings):
         await db.findings.insert_many(docs[i:i + 1000])
 
 
-async def run_scan_job(scan_id: str, storage_path: str, out_dir: str):
+async def run_scan_job(scan_id: str, tmp_apk: str, out_dir: str, storage_path: str):
     loop = asyncio.get_event_loop()
     s = await get_settings()
-    tmp_apk = os.path.join(tempfile.gettempdir(), f"{scan_id}.apk")
     try:
-        await _set(scan_id, status="decompiling", stage="Fetching APK", progress=8)
-        await loop.run_in_executor(EXECUTOR, object_storage.download_to_file, storage_path, tmp_apk)
+        # Persist the APK blob to object storage in the background (best-effort, non-fatal).
+        await _set(scan_id, status="decompiling", stage="Storing APK", progress=8)
+        try:
+            with open(tmp_apk, "rb") as fh:
+                blob = fh.read()
+            await loop.run_in_executor(EXECUTOR, object_storage.put_object, storage_path, blob)
+            del blob
+        except Exception as exc:  # noqa
+            logger.warning("object storage upload failed (continuing with local copy): %s", exc)
 
         await _set(scan_id, status="decompiling", stage="Running JADX decompiler", progress=15)
         await loop.run_in_executor(EXECUTOR, run_jadx, s["jadx_bin"], tmp_apk, out_dir)
@@ -194,26 +200,17 @@ async def upload_apk(file: UploadFile = File(...)):
     out_dir = WORKSPACE / scan_id
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    # Stream to a temp file on disk (not fully in memory), then push to object storage.
+    # Stream multipart body to a temp file on disk (never fully in memory).
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".apk")
     size = 0
     try:
         while chunk := await file.read(1024 * 1024):
             tmp.write(chunk)
             size += len(chunk)
-        tmp.close()
-        storage_path = f"{object_storage.APP_NAME}/uploads/{scan_id}.apk"
-        loop = asyncio.get_event_loop()
-        with open(tmp.name, "rb") as fh:
-            blob = fh.read()
-        await loop.run_in_executor(EXECUTOR, object_storage.put_object, storage_path, blob)
-    except Exception as exc:  # noqa
-        logger.exception("upload/storage failed")
-        raise HTTPException(502, f"Object storage upload failed: {exc}")
     finally:
-        if os.path.exists(tmp.name):
-            os.unlink(tmp.name)
+        tmp.close()
 
+    storage_path = f"{object_storage.APP_NAME}/uploads/{scan_id}.apk"
     doc = {
         "id": scan_id, "filename": file.filename, "size": size,
         "storage_path": storage_path,
@@ -222,7 +219,9 @@ async def upload_apk(file: UploadFile = File(...)):
         "is_sample": False, "created_at": now_iso(), "updated_at": now_iso(),
     }
     await db.scans.insert_one(doc)
-    asyncio.create_task(run_scan_job(scan_id, storage_path, str(out_dir)))
+    # Heavy work (object-storage upload + decompile + scan) runs in the background
+    # so the HTTP response returns immediately and the UI never blocks.
+    asyncio.create_task(run_scan_job(scan_id, tmp.name, str(out_dir), storage_path))
     doc.pop("_id", None)
     return doc
 

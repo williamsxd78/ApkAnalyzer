@@ -7,6 +7,17 @@ class EngineError(Exception):
     pass
 
 
+def _engine_env():
+    """Return a subprocess env with JAVA_HOME/bin prepended to PATH so the
+    JADX/apktool launcher scripts can find `java`."""
+    env = dict(os.environ)
+    java_home = os.environ.get("JAVA_HOME")
+    if java_home:
+        env["JAVA_HOME"] = java_home
+        env["PATH"] = os.path.join(java_home, "bin") + os.pathsep + env.get("PATH", "")
+    return env
+
+
 def check_engines(jadx_bin: str, apktool_bin: str):
     """Return availability dict for configured engine binaries."""
     return {
@@ -21,8 +32,10 @@ def _runnable(path: str) -> bool:
 
 
 def _java_available() -> bool:
+    java_home = os.environ.get("JAVA_HOME")
+    java_cmd = os.path.join(java_home, "bin", "java") if java_home else "java"
     try:
-        subprocess.run(["java", "-version"], capture_output=True, timeout=15)
+        subprocess.run([java_cmd, "-version"], capture_output=True, timeout=15, env=_engine_env())
         return True
     except (OSError, subprocess.SubprocessError):
         return False
@@ -45,7 +58,7 @@ def run_apktool(apktool_bin: str, apk_path: str, out_dir: str):
 
 def _run(cmd, name, timeout):
     try:
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, env=_engine_env())
     except FileNotFoundError:
         raise EngineError(f"{name} binary not found at '{cmd[0]}'. Configure the path in Settings.")
     except subprocess.TimeoutExpired:
