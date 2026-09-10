@@ -1,0 +1,57 @@
+package com.yuno.payments.core.useCases;
+
+import kotlin.Metadata;
+
+/* compiled from: YunoEventReporter.kt */
+@Metadata(d1 = {"\u0000\f\n\u0002\u0018\u0002\n\u0002\u0010\u0010\n\u0002\b2\b\u0080\u0001\u0018\u00002\b\u0012\u0004\u0012\u00020\u00000\u0001B\u0007\b\u0002¢\u0006\u0002\u0010\u0002j\u0002\b\u0003j\u0002\b\u0004j\u0002\b\u0005j\u0002\b\u0006j\u0002\b\u0007j\u0002\b\bj\u0002\b\tj\u0002\b\nj\u0002\b\u000bj\u0002\b\fj\u0002\b\rj\u0002\b\u000ej\u0002\b\u000fj\u0002\b\u0010j\u0002\b\u0011j\u0002\b\u0012j\u0002\b\u0013j\u0002\b\u0014j\u0002\b\u0015j\u0002\b\u0016j\u0002\b\u0017j\u0002\b\u0018j\u0002\b\u0019j\u0002\b\u001aj\u0002\b\u001bj\u0002\b\u001cj\u0002\b\u001dj\u0002\b\u001ej\u0002\b\u001fj\u0002\b j\u0002\b!j\u0002\b\"j\u0002\b#j\u0002\b$j\u0002\b%j\u0002\b&j\u0002\b'j\u0002\b(j\u0002\b)j\u0002\b*j\u0002\b+j\u0002\b,j\u0002\b-j\u0002\b.j\u0002\b/j\u0002\b0j\u0002\b1j\u0002\b2¨\u00063"}, d2 = {"Lcom/yuno/payments/core/useCases/EventsType;", "", "(Ljava/lang/String;I)V", "paymentMethod_selected", "paymentMethod_confirmed", "checkoutSdk_Abandoned", "checkoutSdk_returned", "checkoutSdk_completed", "checkoutSdk_action", "paymentMethodForm_viewed", "paymentMethodForm_submitted", "paymentMethodForm_closed", "paymentMethodForm_termsClicked", "paymentMethodForm_PrivacyPolicyClicked", "paymentMethodForm_clickedNext", "paymentMethodForm_clickedPrevious", "paymentInstructionsForm_viewed", "paymentInstructionsForm_codeCopied", "paymentInstructionsForm_referenceCopied", "paymentInstructionsForm_closed", "otpForm_viewed", "otpForm_closed", "otpForm_submitted", "paymentStatus_pageViewed", "paymentStatus_clickedReturnToMerchant", "paymentStatus_closed", "enrollCheckoutSdk_Abandoned", "enrollCheckoutSdk_returned", "enrollCheckoutSdk_completed", "enrollPaymentMethod_confirmed", "enrollPaymentMethodForm_viewed", "enrollPaymentMethodForm_submitted", "enrollPaymentMethodForm_clickedNext", "enrollPaymentMethodForm_clickedPrevious", "enrollStatus_pageViewed", "enrollStatus_clickedReturnToMerchant", "enrollStatus_closed", "securityCodeForm_viewed", "securityCodeForm_closed", "securityCodeForm_submitted", "installmentsForm_viewed", "installmentsForm_closed", "installmentsForm_submitted", "sdk_initialized", "paymentMethodOtt_created", "paymentStatus_checked", "sdk_error", "payment_pix_googlePayButtonClicked", "payment_pix_googlePayButtonClosed", "payment_pix_googlePayButtonPaymentMade", "card_luhn_result_at_runtime", "Yuno_release"}, k = 1, mv = {1, 8, 0}, xi = 48)
+/* loaded from: classes6.dex */
+public enum EventsType {
+    paymentMethod_selected,
+    paymentMethod_confirmed,
+    checkoutSdk_Abandoned,
+    checkoutSdk_returned,
+    checkoutSdk_completed,
+    checkoutSdk_action,
+    paymentMethodForm_viewed,
+    paymentMethodForm_submitted,
+    paymentMethodForm_closed,
+    paymentMethodForm_termsClicked,
+    paymentMethodForm_PrivacyPolicyClicked,
+    paymentMethodForm_clickedNext,
+    paymentMethodForm_clickedPrevious,
+    paymentInstructionsForm_viewed,
+    paymentInstructionsForm_codeCopied,
+    paymentInstructionsForm_referenceCopied,
+    paymentInstructionsForm_closed,
+    otpForm_viewed,
+    otpForm_closed,
+    otpForm_submitted,
+    paymentStatus_pageViewed,
+    paymentStatus_clickedReturnToMerchant,
+    paymentStatus_closed,
+    enrollCheckoutSdk_Abandoned,
+    enrollCheckoutSdk_returned,
+    enrollCheckoutSdk_completed,
+    enrollPaymentMethod_confirmed,
+    enrollPaymentMethodForm_viewed,
+    enrollPaymentMethodForm_submitted,
+    enrollPaymentMethodForm_clickedNext,
+    enrollPaymentMethodForm_clickedPrevious,
+    enrollStatus_pageViewed,
+    enrollStatus_clickedReturnToMerchant,
+    enrollStatus_closed,
+    securityCodeForm_viewed,
+    securityCodeForm_closed,
+    securityCodeForm_submitted,
+    installmentsForm_viewed,
+    installmentsForm_closed,
+    installmentsForm_submitted,
+    sdk_initialized,
+    paymentMethodOtt_created,
+    paymentStatus_checked,
+    sdk_error,
+    payment_pix_googlePayButtonClicked,
+    payment_pix_googlePayButtonClosed,
+    payment_pix_googlePayButtonPaymentMade,
+    card_luhn_result_at_runtime
+}

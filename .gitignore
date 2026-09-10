@@ -82,3 +82,10 @@ memory/test_credentials.md
 android-sdk/engines/jadx/lib/jadx-1.5.0-all.jar
 engines/jdk/lib/modules
 engines/jadx/lib/jadx-1.5.0-all.jar
+.env
+.env.*
+*.env
+credentials.json
+*.key
+.credentials
+data/uploads_tmp/cd78f314-c420-4019-a5be-eee1a841ad31.apk
