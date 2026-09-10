@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Acme Wallet</string>
+    <string name="api_base">https://api.acme-wallet.com/v2/</string>
+    <string name="google_api_key">AIzaSyD9k2Lp0Qw3Er4Ty6Ui8Op1As2Df3Gh4Jk5</string>
+    <string name="firebase_url">https://acme-wallet-prod.firebaseio.com</string>
+    <string name="gcm_sender">AAAA1B2c3D4:APA91bHm_fake_token_placeholder</string>
+    <string name="support_email">security@acme-wallet.com</string>
+    <string name="legacy_endpoint">http://legacy.acme-wallet.com/api/v1/</string>
+    <string name="maps_url">https://maps.googleapis.com/maps/api/geocode/json</string>
+</resources>

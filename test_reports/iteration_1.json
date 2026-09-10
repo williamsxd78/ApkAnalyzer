@@ -1,0 +1,31 @@
+{
+  "summary": "Full backend + frontend regression of APKLens completed. All 18 backend pytest cases pass against the public REACT_APP_BACKEND_URL and every UI flow listed in the review request is verified working (finding selection loads BOTH right inspector and center code viewer, triage buttons persist, category tabs switch, filters work, global search returns results and selecting a result opens source, custom rules CRUD + rescan works, deobfuscator decodes base64, settings dialog reports java/jadx/apktool as ok).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Files tab / FileTree", "issues": ["Comment in FileTree.tsx claims 'auto-expand top two levels on first render' but implementation never pre-populates the expanded map, so all directories are collapsed initially. Users must click into apktool/jadx to reach files. Not blocking — tree does expand on click.", "Directory (dir) nodes in FileTree have no data-testid, only leaf file nodes do (file-tree-item-<name>). Consider adding file-tree-dir-<name> for testability."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_apklens.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [
+    "(Optional) Implement the promised auto-expand of top 2 levels in FileTree.tsx so users see files immediately after opening the Files tab.",
+    "(Optional) Add data-testid to directory rows in FileTree for E2E automation."
+  ],
+  "critical_code_review_comments": [
+    "server.py file_tree() uses os.walk and stops silently when count>8000 (potential silent truncation).",
+    "run_scan_job uses asyncio.create_task without holding a reference — if server restarts, the task is cancelled silently. Fine for MVP.",
+    "settings collection uses '_id': 'engines' string; not exposed in JSON responses so safe.",
+    "audit_manifest builds rel path using dirname(dirname(...)) which yields 'apktool/AndroidManifest.xml' by convention — fragile but seeded data matches.",
+    "FileTree auto-expand comment vs implementation mismatch (see UI note).",
+    "No pagination UI hint when findings > 100 (backend defaults limit=100)."
+  ],
+  "updated_files": ["/app/backend/tests/test_apklens.py"],
+  "success_rate": {"backend": "100% (18/18)", "frontend": "100% of specified flows verified"},
+  "test_credentials": "none (no auth). Sample scan id: sample-acme-wallet-demo. Counts: total=65, secret=15, endpoint=22, manifest=17, crypto=8, custom=3; critical=5, high=21, medium=24, info=14, low=1.",
+  "seed_data_creation": "None new. Backend seeds sample-acme-wallet-demo on startup.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Backend test file at /app/backend/tests/test_apklens.py is reusable regression suite. Use REACT_APP_BACKEND_URL from frontend/.env. Sample scan id 'sample-acme-wallet-demo' must persist. Note the two minor UX items on FileTree (auto-expand + dir data-testid) if time permits."
+}

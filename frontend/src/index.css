@@ -1,0 +1,60 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #0A0B10;
+  --surface: #10121B;
+  --card: #161926;
+  --elevated: #1E2235;
+  --border: #23283B;
+  --border-bright: #333A54;
+  --cyan: #00E599;
+  --blue: #38BDF8;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root { height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: #F1F5F9;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+.font-mono, code, pre { font-family: 'JetBrains Mono', 'Fira Code', monospace; }
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: #0A0B10; }
+::-webkit-scrollbar-thumb { background: #2A3048; border: 2px solid #0A0B10; }
+::-webkit-scrollbar-thumb:hover { background: #3A4166; }
+
+.scanlines::before {
+  content: "";
+  position: absolute; inset: 0;
+  background: repeating-linear-gradient(0deg, rgba(0,229,153,0.04) 0px, rgba(0,229,153,0.04) 1px, transparent 1px, transparent 3px);
+  pointer-events: none;
+}
+
+@keyframes linepulse {
+  0% { background-color: rgba(0,229,153,0.35); }
+  100% { background-color: rgba(0,229,153,0.08); }
+}
+.line-jump { animation: linepulse 1.2s ease-out; }
+
+@keyframes fadein { from { opacity: 0; transform: translateY(4px);} to { opacity: 1; transform: none; } }
+.animate-fadein { animation: fadein 0.25s ease-out both; }
+
+@keyframes barflow { 0% { background-position: 0 0; } 100% { background-position: 40px 0; } }
+.progress-flow {
+  background-image: linear-gradient(45deg, rgba(0,229,153,0.25) 25%, transparent 25%, transparent 50%, rgba(0,229,153,0.25) 50%, rgba(0,229,153,0.25) 75%, transparent 75%);
+  background-size: 40px 40px;
+  animation: barflow 0.8s linear infinite;
+}
+
+::selection { background: rgba(0,229,153,0.3); color: #fff; }

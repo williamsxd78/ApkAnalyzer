@@ -1,0 +1,124 @@
+{
+  "project_name": "APKLens",
+  "app_type": "Dashboard (Developer / Security Tooling / IDE-like)",
+  "theme": "Dark, Terminal-style Pentester Cockpit (#0A0B10 / #10121B)",
+  "emotional_archetype": "Tactical Telemetry & Cyberpunk Security IDE",
+  "typography": {
+    "heading_font": "JetBrains Mono, IBM Plex Mono, monospace",
+    "body_font": "Inter, -apple-system, BlinkMacSystemFont, sans-serif",
+    "code_font": "JetBrains Mono, Fira Code, source-code-pro, monospace",
+    "scale": {
+      "h1": "text-2xl font-bold tracking-tight text-slate-100",
+      "h2": "text-xl font-semibold tracking-tight text-slate-200",
+      "h3": "text-lg font-medium text-slate-200",
+      "h4": "text-base font-medium text-slate-300",
+      "body": "text-sm text-slate-300 leading-relaxed",
+      "small": "text-xs text-slate-400 font-mono",
+      "micro": "text-[10px] text-slate-500 font-mono tracking-widest uppercase"
+    },
+    "rules": [
+      "Use JetBrains Mono or IBM Plex Mono for all terminal outputs, file paths, line numbers, entropy scores, secret values, and code views.",
+      "Headings must be crisp and structured with monospace tags like [APKLENS :: DECOMPILED] or [FINDINGS // SECRETS].",
+      "Never use generic centered layouts or unstyled default fonts."
+    ]
+  },
+  "colors": {
+    "background_base": "#0A0B10",
+    "background_surface": "#10121B",
+    "background_card": "#161926",
+    "background_elevated": "#1E2235",
+    "border_subtle": "#23283B",
+    "border_bright": "#333A54",
+    "primary_cyan": "#00E599",
+    "primary_cyan_hover": "#00C885",
+    "accent_blue": "#38BDF8",
+    "text_primary": "#F1F5F9",
+    "text_secondary": "#94A3B8",
+    "text_muted": "#64748B",
+    "severities": {
+      "critical": {
+        "bg": "bg-rose-950/60",
+        "text": "text-rose-400",
+        "border": "border-rose-800/60",
+        "badge": "bg-rose-500/10 text-rose-400 border-rose-500/30"
+      },
+      "high": {
+        "bg": "bg-amber-950/60",
+        "text": "text-amber-400",
+        "border": "border-amber-800/60",
+        "badge": "bg-amber-500/10 text-amber-400 border-amber-500/30"
+      },
+      "medium": {
+        "bg": "bg-yellow-950/50",
+        "text": "text-yellow-400",
+        "border": "border-yellow-800/50",
+        "badge": "bg-yellow-500/10 text-yellow-400 border-yellow-500/30"
+      },
+      "low": {
+        "bg": "bg-blue-950/50",
+        "text": "text-blue-400",
+        "border": "border-blue-800/50",
+        "badge": "bg-blue-500/10 text-blue-400 border-blue-500/30"
+      },
+      "info": {
+        "bg": "bg-slate-900/60",
+        "text": "text-slate-400",
+        "border": "border-slate-800",
+        "badge": "bg-slate-500/10 text-slate-400 border-slate-500/30"
+      }
+    },
+    "triage_states": {
+      "confirmed": "text-emerald-400 bg-emerald-500/10 border-emerald-500/30",
+      "false_positive": "text-slate-400 bg-slate-500/10 border-slate-500/30 line-through opacity-60",
+      "dismissed": "text-rose-400/80 bg-rose-500/10 border-rose-500/20 opacity-50"
+    }
+  },
+  "layout_and_structure": {
+    "type": "Three-Panel Security IDE Dashboard",
+    "header": "Fixed top bar with APKLens logo, active APK job status, quick stats (Total Secrets, URLs, Vulns), and a prominent Global Search Bar (Cmd/Ctrl + K)",
+    "left_panel": "Width ~280px to 320px. Includes: 1. APK File Tree Navigator; 2. Finding Categories list with badge counts (Secrets, Endpoints, Manifest, Crypto, Custom Rules); 3. Job upload trigger button.",
+    "center_panel": "Flex-1 main viewer. Multi-tabbed container supporting: 1. Code Viewer (with line numbers, syntax highlighting, finding hit indicators, jump-to-line highlight animation); 2. Manifest Audit Matrix; 3. Endpoints & URLs table; 4. Custom Rules Manager; 5. Quick Deobfuscator Tool.",
+    "right_panel": "Width ~340px to 380px. Finding Detail Drawer / Inspector. Displays: Full secret/endpoint value (unmasked as per user choice), entropy score, pattern signature, file path & line link, severity badge, triage actions (Confirm / False Positive / Dismiss), and raw context lines."
+  },
+  "visual_enhancers": {
+    "effects": [
+      "Subtle 1px borders with dark tinted Slate (#23283B) separating all IDE panels",
+      "Code highlight pulse animation when jumping from search or finding detail to exact line in source code viewer",
+      "Terminal scanline backdrop overlay for active decompilation / scanning status screens",
+      "Glassmorphism modal for Global Search Command Palette (backdrop-blur-md bg-[#0A0B10]/80)",
+      "Custom dark scrollbars with rounded-none 4px tracks to match terminal aesthetics"
+    ]
+  },
+  "component_guidelines": {
+    "global_search_modal": "Instant search overlay triggered by Cmd/Ctrl+K or clicking the top search bar. Filters through decompiled files, extracted secrets, endpoints, and manifest nodes in real-time.",
+    "apk_upload_progress": "Drag & drop upload zone with step progress: queued -> decompiling (JADX/apktool status) -> scanning -> complete. Interactive logs drawer.",
+    "source_code_viewer": "Monospace code block with line numbering. Highlight finding lines with bright tint (e.g. bg-rose-500/20 border-l-2 border-rose-500). Clicking a line copies file:line reference.",
+    "deobfuscator_drawer": "Quick utility tool supporting Base64 decode, Hex decode, URL decode, and ROT13/ROTN with live preview.",
+    "custom_rules_manager": "Form to create and test custom regex + Shannon entropy rules with severity assignment and test payload validator."
+  },
+  "data_testid_requirements": {
+    "mandatory_pattern": "kebab-case data-testid on every interactive button, tab, search input, filter toggle, code line, and triage action.",
+    "examples": [
+      "data-testid=\"global-search-input\"",
+      "data-testid=\"apk-upload-dropzone\"",
+      "data-testid=\"file-tree-item-<filename>\"",
+      "data-testid=\"finding-category-<type>\"",
+      "data-testid=\"triage-confirm-button\"",
+      "data-testid=\"triage-false-positive-button\"",
+      "data-testid=\"triage-dismiss-button\"",
+      "data-testid=\"deobfuscator-input-field\"",
+      "data-testid=\"custom-rule-save-button\""
+    ]
+  },
+  "UNIVERSAL GUIDELINES FOR MAIN AGENT": [
+    "Never center align the main application layout; use precise IDE panel flex and grid structures.",
+    "Always display full secret values without masking, as explicitly selected by user requirements.",
+    "All interactive elements MUST include data-testid attributes for E2E testing validation.",
+    "Ensure global search (Cmd+K) provides sub-millisecond response feedback and immediate jump-to-file capability.",
+    "Use sonner for toast notifications when triage actions or rule updates occur.",
+    "Maintain strict APCA contrast standards for dark theme legibility across all severity badges and code line numbers."
+  ]
+},
+path: "/app/design_guidelines.json",
+overwrite: true
+}
