@@ -250,6 +250,11 @@ export default function Dashboard() {
           </div>
 
           <div className="relative flex-1 overflow-hidden">
+            {activeScan?.warning && !running && (
+              <div data-testid="partial-warning" className="flex items-center gap-2 border-b border-amber-500/30 bg-amber-500/10 px-4 py-2 font-mono text-[11px] text-amber-300">
+                <AlertTriangle className="h-3.5 w-3.5 shrink-0" /> {activeScan.warning}
+              </div>
+            )}
             {running ? (
               <StatusPanel scan={activeScan!} />
             ) : failed ? (

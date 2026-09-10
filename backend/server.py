@@ -31,6 +31,7 @@ WORKSPACE = Path(os.environ.get("SCAN_WORKSPACE", str(ROOT_DIR / "scan_workspace
 WORKSPACE.mkdir(parents=True, exist_ok=True)
 DEFAULT_JADX = os.environ.get("JADX_BIN", "/opt/engines/jadx/bin/jadx")
 DEFAULT_APKTOOL = os.environ.get("APKTOOL_BIN", "/opt/engines/apktool")
+DISABLE_STORAGE = os.environ.get("DISABLE_OBJECT_STORAGE", "").lower() in ("1", "true", "yes")
 
 EXECUTOR = ThreadPoolExecutor(max_workers=2)
 
@@ -175,13 +176,15 @@ async def run_scan_job(scan_id: str, tmp_apk: str, out_dir: str, storage_path: s
     try:
         # Persist the APK blob to object storage (streamed from disk, best-effort, non-fatal).
         await _set(scan_id, status="decompiling", stage="Storing APK", progress=8, decompiled_files=0)
-        try:
-            await loop.run_in_executor(EXECUTOR, object_storage.put_object_file, storage_path, tmp_apk)
-        except Exception as exc:  # noqa
-            logger.warning("object storage upload failed (continuing with local copy): %s", exc)
+        if not DISABLE_STORAGE:
+            try:
+                await loop.run_in_executor(EXECUTOR, object_storage.put_object_file, storage_path, tmp_apk)
+            except Exception as exc:  # noqa
+                logger.warning("object storage upload failed (continuing with local copy): %s", exc)
 
         await _set(scan_id, status="decompiling", stage="Running JADX decompiler", progress=15)
-        await loop.run_in_executor(EXECUTOR, run_jadx, s["jadx_bin"], tmp_apk, out_dir)
+        jadx_res = await loop.run_in_executor(EXECUTOR, run_jadx, s["jadx_bin"], tmp_apk, out_dir)
+        partial = bool(jadx_res.get("partial"))
 
         await _set(scan_id, status="decompiling", stage="Running apktool (manifest/resources)", progress=45)
         await loop.run_in_executor(EXECUTOR, run_apktool, s["apktool_bin"], tmp_apk, out_dir)
@@ -192,8 +195,15 @@ async def run_scan_job(scan_id: str, tmp_apk: str, out_dir: str, storage_path: s
         await _persist_findings(scan_id, findings)
 
         counts = await _count_summary(scan_id)
-        await _set(scan_id, status="complete", stage="Scan complete", progress=100,
-                   counts=counts, finished_at=now_iso())
+        warning = None
+        if partial:
+            warning = ("JADX was time-boxed for this very large APK, so decompiled coverage is "
+                       "partial. Raise ENGINE_JADX_TIMEOUT or run APKLens locally (more CPU/RAM) "
+                       "for full coverage.")
+        await _set(scan_id, status="complete",
+                   stage="Scan complete (partial)" if partial else "Scan complete",
+                   progress=100, counts=counts, warning=warning, partial=partial,
+                   finished_at=now_iso())
     except EngineError as exc:
         logger.exception("engine failure")
         await _set(scan_id, status="failed", stage="Failed", error=str(exc))
@@ -354,7 +364,7 @@ async def delete_scan(scan_id: str):
     part = UPLOAD_TMP / f"{scan_id}.apk"
     if part.exists():
         part.unlink()
-    if doc.get("storage_path"):
+    if doc.get("storage_path") and not DISABLE_STORAGE:
         loop = asyncio.get_event_loop()
         await loop.run_in_executor(EXECUTOR, object_storage.delete_object, doc["storage_path"])
     return {"deleted": scan_id}
@@ -591,11 +601,12 @@ app.add_middleware(
 
 @app.on_event("startup")
 async def startup():
-    try:
-        object_storage.init_storage()
-        logger.info("object storage initialized")
-    except Exception as exc:  # noqa
-        logger.warning("object storage init failed (uploads will error until fixed): %s", exc)
+    if not DISABLE_STORAGE:
+        try:
+            object_storage.init_storage()
+            logger.info("object storage initialized")
+        except Exception as exc:  # noqa
+            logger.warning("object storage init failed (uploads will error until fixed): %s", exc)
     await db.findings.create_index("scan_id")
     await db.findings.create_index([("scan_id", 1), ("category", 1)])
     await db.findings.create_index([("scan_id", 1), ("severity", 1)])

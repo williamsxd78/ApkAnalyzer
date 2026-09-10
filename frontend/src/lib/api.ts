@@ -15,6 +15,8 @@ export type Scan = {
   error?: string | null;
   is_sample?: boolean;
   decompiled_files?: number;
+  warning?: string | null;
+  partial?: boolean;
   counts: { total: number; by_category: Record<string, number>; by_severity: Record<string, number> };
   created_at: string;
 };

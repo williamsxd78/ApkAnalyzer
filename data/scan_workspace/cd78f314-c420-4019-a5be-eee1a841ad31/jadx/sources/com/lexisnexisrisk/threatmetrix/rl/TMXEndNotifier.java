@@ -1,8 +1,0 @@
-package com.lexisnexisrisk.threatmetrix.rl;
-
-import com.lexisnexisrisk.threatmetrix.rl.TMXProfilingHandle;
-
-/* loaded from: classes3.dex */
-public interface TMXEndNotifier {
-    void complete(TMXProfilingHandle.Result result);
-}

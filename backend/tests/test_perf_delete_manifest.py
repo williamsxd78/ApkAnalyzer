@@ -150,7 +150,6 @@ def test_delete_purges(s, uploaded_scan):
     assert not os.path.exists(ws), f"workspace still on disk: {ws}"
 
 
-@pytest.mark.skip(reason="Confirmed bug: DELETE /api/scans/{sample_id} returns 200 and deletes sample. Skipping to avoid re-deleting sample; backend re-seeds on restart. Reported to main agent.")
 def test_sample_delete_forbidden(s):
     """Sample scan must not be deletable (spec). Do NOT actually delete —
     if the endpoint would return 200, that's a backend bug: we detect it via

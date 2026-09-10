@@ -1,7 +1,0 @@
-package com.google.android.gms.maps;
-
-/* compiled from: com.google.android.gms:play-services-maps@@19.2.0 */
-/* loaded from: classes14.dex */
-public interface OnStreetViewPanoramaReadyCallback {
-    void onStreetViewPanoramaReady(StreetViewPanorama streetViewPanorama);
-}

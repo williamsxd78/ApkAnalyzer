@@ -58,33 +58,35 @@ def run_jadx(jadx_bin: str, apk_path: str, out_dir: str):
     sources = os.path.join(out_dir, "jadx")
     os.makedirs(sources, exist_ok=True)
     threads = str(cpu_budget())
-    # Match thread count to the real CPU budget (avoids thrashing when the container
-    # is CPU-throttled) and skip debug info / resources for speed.
     cmd = [jadx_bin, "-d", sources, "--no-res", "--no-debug-info",
            "--threads-count", threads, apk_path]
-    _run(cmd, "JADX", timeout=3600)
-    return sources
+    timeout = int(os.environ.get("ENGINE_JADX_TIMEOUT", "600"))
+    # Soft timeout: very large APKs on a CPU-limited host can grind for a long time.
+    # JADX writes files progressively, so if we hit the budget we keep what was produced
+    # and continue the scan with partial (but substantial) coverage instead of hanging.
+    partial = _run(cmd, "JADX", timeout, soft_timeout=True)
+    return {"sources": sources, "partial": partial}
 
 
 def run_apktool(apktool_bin: str, apk_path: str, out_dir: str):
     decoded = os.path.join(out_dir, "apktool")
-    # -s: skip baksmali (the slow part) — we only need the decoded manifest + resources;
-    # readable code comes from JADX. This dramatically speeds up large APKs.
     cmd = [apktool_bin, "d", "-s", "-f", "-o", decoded, apk_path]
     _run(cmd, "apktool", timeout=1800)
     return decoded
 
 
-def _run(cmd, name, timeout):
+def _run(cmd, name, timeout, soft_timeout=False):
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, env=_engine_env())
     except FileNotFoundError:
         raise EngineError(f"{name} binary not found at '{cmd[0]}'. Configure the path in Settings.")
     except subprocess.TimeoutExpired:
+        if soft_timeout:
+            return True  # timed out -> partial results, caller continues
         raise EngineError(f"{name} timed out while decompiling the APK.")
     except OSError as exc:
         raise EngineError(f"{name} failed to start: {exc}")
     if proc.returncode != 0:
         tail = (proc.stderr or proc.stdout or "").strip()[-600:]
         raise EngineError(f"{name} exited with code {proc.returncode}: {tail}")
-    return proc
+    return False

@@ -89,3 +89,16 @@ credentials.json
 *.key
 .credentials
 data/uploads_tmp/cd78f314-c420-4019-a5be-eee1a841ad31.apk
+
+
+# --- APKLens: exclude heavy/generated content (fixes huge/illegal-filename clones) ---
+engines/
+/opt/engines/
+data/
+scan_workspace/
+backend/scan_workspace/
+uploads_tmp/
+**/uploads_tmp/
+*.apk
+test_reports/
+backend/tests/
